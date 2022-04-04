@@ -1,0 +1,385 @@
+### A Pluto.jl notebook ###
+# v0.14.8
+
+using Markdown
+using InteractiveUtils
+
+# ╔═╡ b9f86ec0-b412-11ec-23eb-599d091d1c7e
+using Markdown
+
+# ╔═╡ a698b516-1374-4239-a778-726f342d3c36
+using InteractiveUtils
+
+# ╔═╡ c4374a31-66dd-4050-a788-75da9b4d9d53
+using CSV
+
+# ╔═╡ 36ccd2c3-e077-4149-b517-8392b33df9b3
+using DataFrames
+
+# ╔═╡ 3d6dcc2d-b049-4be5-be3a-0131f0371f5c
+using RDatasets
+
+# ╔═╡ 488d4021-2a48-4deb-99fe-14418a848206
+using StatsBase
+
+# ╔═╡ 15e27cea-66a3-4007-801e-c71f0ee27511
+using Statistics
+
+# ╔═╡ 013b8eb0-63d4-440d-80de-fe8994726591
+using Parameters: @with_kw
+
+# ╔═╡ 8dcf3fdf-4425-4c09-999e-0cea5664a042
+using PlutoUI
+
+# ╔═╡ 5a4669fe-4bf0-4ef5-bd83-66ee2df9454e
+using Flux
+
+# ╔═╡ 66c815a4-09a0-4e0f-9449-96c7b6cfc1b6
+using Flux: train!
+
+# ╔═╡ e183cd7f-4d7f-45b4-9e12-315b040a2b09
+using Flux: gradient
+
+# ╔═╡ f3461ed6-7357-41ff-9904-7f91ce1fd8c6
+using Flux.Optimise: update!
+
+# ╔═╡ 8896f100-9d99-4cf3-a205-2b45fd097082
+using Flux: onehotbatch, onecold, crossentropy
+
+# ╔═╡ a77c47e1-f8e3-4405-9ffa-b44cb9a76ae5
+using Flux: @epochs
+
+# ╔═╡ babd906d-9509-4cc3-a543-76e8ffdd4955
+using Plots
+
+# ╔═╡ 60c60eee-e449-4184-bf3b-19110c0a3362
+real_estate_df = CSV.read("C:/Users/Bytebox Technologies/Documents/ARI711S/archive/Real estate.csv", DataFrame)
+
+# ╔═╡ 636e6e0c-d0f8-44b5-a793-1f9eda7f1139
+begin
+	rename!(real_estate_df, Symbol.(replace.(string.(names(real_estate_df)), Ref(r"\[m\]"=>"_"))))
+	rename!(real_estate_df, Symbol.(replace.(string.(names(real_estate_df)), Ref(r"\[s\]"=>"_"))))
+	rename!(real_estate_df, Symbol.(replace.(string.(names(real_estate_df)), Ref(r"\s"=>"_"))))
+end
+
+# ╔═╡ 92233e9e-7dfc-4892-8809-e11c8b5b475d
+# data exploration
+
+# ╔═╡ 2aa6c9d3-f1e0-4d6e-872b-227e7d452527
+size(real_estate_df)
+
+# ╔═╡ 5ded264e-3186-4c7f-bc62-a08733215216
+with_terminal() do
+	for col_name in names(real_estate_df)
+		println(col_name) 
+	end
+end
+
+# ╔═╡ 61ef9665-55ce-4f69-893e-75ce1b71fdff
+cor(Matrix(real_estate_df))
+
+# ╔═╡ 0a6142b5-ff7c-45ed-bf7e-188ff760bcf7
+# matrix
+
+# ╔═╡ 0e6163aa-be4f-480a-859d-d3fc3b7793f4
+X = real_estate_df[:, 2:7]
+
+# ╔═╡ 62477f75-f083-4bdc-b776-ebafad3791fe
+X_m = Matrix(X)
+
+# ╔═╡ 5bdcd4ae-cfb6-4b6f-a6ff-e9b0c7db71cb
+# vector
+
+# ╔═╡ df0c3720-21bb-4ecd-9221-74a8693d6eab
+Y = real_estate_df[:, 7]
+
+# ╔═╡ 903de2c7-b3bb-4206-8f33-c4fa9c074c8b
+Y_m = Vector(Y)
+
+
+# ╔═╡ 3e3bb9b6-a845-4aaf-a847-682cc73222f0
+training_size = 0.7
+
+# ╔═╡ 42043d1d-1172-4dbb-bb83-4e1a85e9616b
+data_size = size(X_m)[2]
+
+# ╔═╡ 11838428-3526-4e5a-b28a-9d0bdf2a06e6
+training_index = trunc(Int, training_size * data_size)
+
+# ╔═╡ 2cdc6cc6-59cd-4e47-9790-f5e5c8e78e03
+Xtrain = X_m[1:training_index, :]
+
+# ╔═╡ 44d64a6a-ff18-4b2d-8154-18c07bdb3658
+Xtest = X_m[training_index+1:end, :]
+
+# ╔═╡ 7d94eefc-5b9b-43ca-bbc5-b9ea209ac276
+Ytrain = Y_m[1:training_index]
+
+# ╔═╡ a9d94b58-76bb-4c56-9a92-42758b2e50c7
+Ytest = Y_m[training_index+1:end]
+
+# ╔═╡ 73a5450b-591d-4db6-9a6a-2e4d740dfd9b
+function get_processed_data(args)
+
+    x = (x .- mean(x, dims = 1)) ./ std(x, dims = 1)
+
+    train_data = (Xtrain, Ytrain)
+    test_data = (Xtest, Ytest)
+
+    return train_data,test_data
+end
+
+# ╔═╡ 661d9be6-83e9-4521-a925-fe498c2f1c5a
+begin
+	plot(Xtrain, Ytrain, title="linear regression", label="train data", seriestype = :scatter)
+	
+    plot!(Xtest, Ytest, label="test data", seriestype = :scatter)
+end
+
+# ╔═╡ 7f74950a-34d1-4f22-a22d-7e0ae5ac6b05
+# defining the model
+
+# ╔═╡ 7c346d11-98a7-45c5-a0fa-c2bc4211a06f
+mod(x) = w*x + b
+
+# ╔═╡ 6662d61f-b05d-43aa-94de-c2067d9712a6
+model =
+  Dense(85,5)
+
+# ╔═╡ 5af52918-fa31-4057-aa8c-1b1ec659ca6b
+ps = Flux.params(model)
+
+# ╔═╡ e5099c82-6709-4448-a1d4-a2074c54bf06
+function loss(x, y)
+  ŷ = model(x)
+  sum((y .- ŷ).^2)
+end
+
+# ╔═╡ 006934fb-6e82-40e9-bb5b-a74bbd4cab31
+optimiser = Descent()
+
+# ╔═╡ 24346211-bef1-4099-84e9-ef080b05c01b
+predict(x) = model(x)
+
+# ╔═╡ 3fa7f0ec-7c80-4ca5-8ab0-c42536285caf
+meansquarederror(ŷ, y) = sum((ŷ .- y).^2)/size(y, 2)
+
+# ╔═╡ f00e4daf-61cc-4770-a766-efcad189ff29
+function get_loss(features::Matrix{Float64}, outcome::Vector{Float64}, weights::Vector{Float64})::Float64
+	m = size(features)[1]
+	hypothesis = features * weights
+	loss = hypothesis - outcome
+	cost = (1/(2m)) * (loss' * loss)
+	return cost
+end
+
+# ╔═╡ 00864c44-9dba-4121-ab89-116042fbb396
+function get_scaling_params(init_features::Matrix{Float64})::Tuple{Matrix{Float64}, Matrix{Float64}}
+	feature_mean = mean(init_features, dims=2)
+	f_dev = std(init_features, dims=2)
+	return (feature_mean, f_dev)
+end
+
+# ╔═╡ f5b99451-d10e-466f-87db-76d5b53f3bb9
+function scale_features(features::Matrix{Float64}, sc_params::Tuple{Matrix{Float64}, Matrix{Float64}})::Matrix{Float64}
+	normalised_features = (features .- sc_params[1]) ./ sc_params[2]
+end
+
+# ╔═╡ 90437249-74bf-4f36-a0b3-2858ccaad8cf
+scaling_params = get_scaling_params(X_train)
+
+# ╔═╡ 476924cb-da73-4215-9e22-d7418e492b44
+scaling_params[1]
+
+# ╔═╡ 7c6f4f40-e329-4096-a1d6-e588d6a954ac
+last(scaling_params)
+
+# ╔═╡ f9b7bdf2-f0c8-479c-9524-e946751f6305
+scaled_training_features = scale_features(X_train, scaling_params)
+
+# ╔═╡ 30a4db20-0dc1-47e0-b524-aad07de5c602
+scaled_testing_features = scale_features(X_test, scaling_params)
+
+# ╔═╡ e9fde373-d6d8-49b4-81d1-04cb9203140c
+#the model"
+
+# ╔═╡ c1ed7523-da4e-4f9d-94dd-891fae353243
+predict(x, m) = m.W*x .+ m.b
+
+# ╔═╡ 654ada7f-d1b4-49e7-8c41-4debe7a919a0
+pred_0 = predict(X_test)
+
+# ╔═╡ 3b055131-40a2-4d1a-bc8a-79ece07d6318
+loss_0 = loss(predict(X_test), Y_test)
+
+# ╔═╡ 376a04e3-118b-424c-8306-ce9b691e4ec2
+function train_model(features::Matrix{Float64}, outcome::Vector{Float64}, alpha::Float64, n_iter::Int64)::Tuple{Vector{Float64}, Vector{Float64}}
+	total_entry_count = length(outcome)
+	aug_features = hcat(ones(total_entry_count, 1), features)
+	feature_count = size(aug_features)[2]
+	weights = zeros(feature_count)
+	loss_vals = zeros(n_iter)
+
+	for i in range(1, stop=n_iter)
+		pred = aug_features * weights
+		loss_vals[i] = get_loss(aug_features, outcome, weights)
+		weights = weights - ((alpha/total_entry_count) * aug_features') * (pred - outcome)
+	end
+	
+	return (weights, loss_vals)
+end
+
+# ╔═╡ 96870414-a520-4966-bcaa-01dbf88d9cfc
+data = zip(X_train, Y_train)
+
+# ╔═╡ 922699ff-6570-4193-9ffe-d0d2b8716b52
+Flux.train!(loss, params(w, b), data, opt)
+
+# ╔═╡ 38b7d2d8-4e42-4ca2-8b0a-5670d7ad7c12
+pred_1 = model(X_test)
+
+# ╔═╡ 4821f676-3881-4286-8b68-dc5a77fbe26b
+begin
+	plot(X_train', Y_train', title="linear regression", label="train data", seriestype = :scatter)
+    plot!(X_test', Y_test', label="test data", seriestype = :scatter)
+    plot!(X_test', pred_0', label="iniatial predictions")
+    plot!(X_test', pred_1', label="Final predictions")
+end
+
+# ╔═╡ 87f9710c-8c63-4879-809b-e97db79d89e9
+weights_tr_errors = train_model(scaled_training_features, Y_train, 0.6,700)
+
+# ╔═╡ 3e59b4b3-be35-4a48-96b9-73d7bfe1c67a
+plot(weights_tr_errors[2],
+	label="Cost",
+	ylabel="Cost",
+	xlabel="Number of Iteration", 
+	title="Cost Per Iteration")
+
+# ╔═╡ 7844a223-1140-4089-85d3-8d9dfd362b37
+function get_predictions(features::Matrix{Float64}, weights::Vector{Float64})::Vector{Float64}
+	total_entry_count = size(features)[1]
+	aug_features = hcat(ones(total_entry_count, 1), features)
+	preds = aug_features * weights
+	return preds
+end
+
+# ╔═╡ 6a139f49-f5bc-472e-bf9a-9e9070c58aa7
+function root_mean_square_error(actual_outcome::Vector{Float64}, predicted_outcome::Vector{Float64})::Float64
+	errors = predicted_outcome - actual_outcome
+	squared_errors = errors .^ 2
+	mean_squared_errors = mean(squared_errors)
+	rmse = sqrt(mean_squared_errors)
+	return rmse
+end
+
+# ╔═╡ df1a46b7-1f49-4c70-8c10-47e70f218aff
+training_predictions = get_predictions(scaled_training_features, weights_tr_errors[1])
+
+# ╔═╡ 1aeceaef-7a88-493e-896f-4e2403e109b1
+testing_predictions = get_predictions(scaled_testing_features,weights_tr_errors[1])
+
+# ╔═╡ 83f6d924-5033-4496-9759-3ba5b19c778d
+root_mean_square_error(Y_train, training_predictions)
+
+# ╔═╡ e6d280cc-7fdb-4df6-81e9-1261dc1d92d8
+root_mean_square_error(Y_test, testing_predictions)
+
+# ╔═╡ 93798b76-d4e4-4427-8fa5-f83d9e7ea0a9
+function ridge_regression_model(Y, X, γ, λ = 0)
+    (T, K) = (size(X, 1), size(X, 2))
+
+    b_ls = X \ Y                    
+
+    Q = X'X / T
+    c = X'Y / T                      
+
+    b = Variable(K)              
+    L1 = quadform(b, Q)            
+    L2 = dot(c, b)                 
+    L3 = norm(b, 1)                
+    L4 = sumsquares(b)            
+
+    if λ > 0
+        Sol = minimize(L1 - 2 * L2 + γ * L3 + λ * L4)      
+    else
+        Sol = minimize(L1 - 2 * L2 + γ * L3)               
+    end
+    solve!(Sol, SCS.Optimizer; silent_solver = true)
+    Sol.status == Convex.MOI.OPTIMAL ? b_i = vec(evaluate(b)) : b_i = NaN
+
+    return b_i, b_ls
+end
+
+# ╔═╡ Cell order:
+# ╠═b9f86ec0-b412-11ec-23eb-599d091d1c7e
+# ╠═a698b516-1374-4239-a778-726f342d3c36
+# ╠═c4374a31-66dd-4050-a788-75da9b4d9d53
+# ╠═36ccd2c3-e077-4149-b517-8392b33df9b3
+# ╠═3d6dcc2d-b049-4be5-be3a-0131f0371f5c
+# ╠═488d4021-2a48-4deb-99fe-14418a848206
+# ╠═15e27cea-66a3-4007-801e-c71f0ee27511
+# ╠═013b8eb0-63d4-440d-80de-fe8994726591
+# ╠═8dcf3fdf-4425-4c09-999e-0cea5664a042
+# ╠═5a4669fe-4bf0-4ef5-bd83-66ee2df9454e
+# ╠═66c815a4-09a0-4e0f-9449-96c7b6cfc1b6
+# ╠═e183cd7f-4d7f-45b4-9e12-315b040a2b09
+# ╠═f3461ed6-7357-41ff-9904-7f91ce1fd8c6
+# ╠═8896f100-9d99-4cf3-a205-2b45fd097082
+# ╠═a77c47e1-f8e3-4405-9ffa-b44cb9a76ae5
+# ╠═babd906d-9509-4cc3-a543-76e8ffdd4955
+# ╠═60c60eee-e449-4184-bf3b-19110c0a3362
+# ╠═636e6e0c-d0f8-44b5-a793-1f9eda7f1139
+# ╠═92233e9e-7dfc-4892-8809-e11c8b5b475d
+# ╠═2aa6c9d3-f1e0-4d6e-872b-227e7d452527
+# ╠═5ded264e-3186-4c7f-bc62-a08733215216
+# ╠═61ef9665-55ce-4f69-893e-75ce1b71fdff
+# ╠═0a6142b5-ff7c-45ed-bf7e-188ff760bcf7
+# ╠═0e6163aa-be4f-480a-859d-d3fc3b7793f4
+# ╠═62477f75-f083-4bdc-b776-ebafad3791fe
+# ╠═5bdcd4ae-cfb6-4b6f-a6ff-e9b0c7db71cb
+# ╠═df0c3720-21bb-4ecd-9221-74a8693d6eab
+# ╠═903de2c7-b3bb-4206-8f33-c4fa9c074c8b
+# ╠═3e3bb9b6-a845-4aaf-a847-682cc73222f0
+# ╠═42043d1d-1172-4dbb-bb83-4e1a85e9616b
+# ╠═11838428-3526-4e5a-b28a-9d0bdf2a06e6
+# ╠═2cdc6cc6-59cd-4e47-9790-f5e5c8e78e03
+# ╠═44d64a6a-ff18-4b2d-8154-18c07bdb3658
+# ╠═7d94eefc-5b9b-43ca-bbc5-b9ea209ac276
+# ╠═a9d94b58-76bb-4c56-9a92-42758b2e50c7
+# ╠═73a5450b-591d-4db6-9a6a-2e4d740dfd9b
+# ╠═661d9be6-83e9-4521-a925-fe498c2f1c5a
+# ╠═7f74950a-34d1-4f22-a22d-7e0ae5ac6b05
+# ╠═7c346d11-98a7-45c5-a0fa-c2bc4211a06f
+# ╠═6662d61f-b05d-43aa-94de-c2067d9712a6
+# ╠═5af52918-fa31-4057-aa8c-1b1ec659ca6b
+# ╠═e5099c82-6709-4448-a1d4-a2074c54bf06
+# ╠═006934fb-6e82-40e9-bb5b-a74bbd4cab31
+# ╠═24346211-bef1-4099-84e9-ef080b05c01b
+# ╠═654ada7f-d1b4-49e7-8c41-4debe7a919a0
+# ╠═3b055131-40a2-4d1a-bc8a-79ece07d6318
+# ╠═3fa7f0ec-7c80-4ca5-8ab0-c42536285caf
+# ╠═f00e4daf-61cc-4770-a766-efcad189ff29
+# ╠═00864c44-9dba-4121-ab89-116042fbb396
+# ╠═f5b99451-d10e-466f-87db-76d5b53f3bb9
+# ╠═90437249-74bf-4f36-a0b3-2858ccaad8cf
+# ╠═476924cb-da73-4215-9e22-d7418e492b44
+# ╠═7c6f4f40-e329-4096-a1d6-e588d6a954ac
+# ╠═f9b7bdf2-f0c8-479c-9524-e946751f6305
+# ╠═30a4db20-0dc1-47e0-b524-aad07de5c602
+# ╠═e9fde373-d6d8-49b4-81d1-04cb9203140c
+# ╠═c1ed7523-da4e-4f9d-94dd-891fae353243
+# ╠═376a04e3-118b-424c-8306-ce9b691e4ec2
+# ╠═96870414-a520-4966-bcaa-01dbf88d9cfc
+# ╠═922699ff-6570-4193-9ffe-d0d2b8716b52
+# ╠═38b7d2d8-4e42-4ca2-8b0a-5670d7ad7c12
+# ╠═4821f676-3881-4286-8b68-dc5a77fbe26b
+# ╠═87f9710c-8c63-4879-809b-e97db79d89e9
+# ╠═3e59b4b3-be35-4a48-96b9-73d7bfe1c67a
+# ╠═7844a223-1140-4089-85d3-8d9dfd362b37
+# ╠═6a139f49-f5bc-472e-bf9a-9e9070c58aa7
+# ╠═df1a46b7-1f49-4c70-8c10-47e70f218aff
+# ╠═1aeceaef-7a88-493e-896f-4e2403e109b1
+# ╠═83f6d924-5033-4496-9759-3ba5b19c778d
+# ╠═e6d280cc-7fdb-4df6-81e9-1261dc1d92d8
+# ╠═93798b76-d4e4-4427-8fa5-f83d9e7ea0a9

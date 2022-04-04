@@ -1,0 +1,324 @@
+### A Pluto.jl notebook ###
+# v0.14.8
+
+using Markdown
+using InteractiveUtils
+
+# ╔═╡ 4f1ec150-b3de-11ec-3f9f-db6cf54ada63
+using Pkg
+
+# ╔═╡ 9463ff9e-06fd-41c7-8f64-54fc64b42bcd
+Pkg.activate("Project.toml")
+
+# ╔═╡ ccf17592-b521-4a58-b214-9cd3e34d0264
+using Images
+
+# ╔═╡ a2ce2e7d-0615-475e-b3b8-8b9ce314d646
+using ImageView
+
+# ╔═╡ c18e0609-311b-490d-9d5b-cfafe605f51c
+using TestImages
+
+# ╔═╡ 214febd3-18a4-407b-941f-06d95d56a31e
+using FileIO
+
+# ╔═╡ cc7e687b-dd63-420b-bf48-c4ffa596ac51
+using PlutoUI
+
+# ╔═╡ 4ff80e3e-599b-45b2-8d2c-59fa9cd334ed
+using Flux
+
+# ╔═╡ 51ec180c-1a5c-4378-b873-9ba320166fe5
+using Flux: Data.DataLoader
+
+# ╔═╡ c379e610-a11a-459a-b929-ff41674bcd1a
+using Flux: gradient
+
+# ╔═╡ 1460bebf-eb78-4a52-955d-6241b2e82866
+using Flux: @epochs
+
+# ╔═╡ 8c4d99b0-ba06-4e29-a31e-1564d48c3e0d
+using Statistics
+
+# ╔═╡ 9c547013-90e6-49aa-8ecc-9c43c4cadc10
+using Plots
+
+# ╔═╡ aea554c2-6199-4f17-a735-68c3b3614534
+using Flux: onehotbatch, onecold, crossentropy, throttle, logitcrossentropy
+
+# ╔═╡ b55eabd1-101f-40fb-bb55-350c3bcb90c4
+using Markdown
+
+# ╔═╡ cc274870-cd4d-4d3a-9bd1-b44ee6a5db5f
+using InteractiveUtils
+
+# ╔═╡ 438d34df-d1cd-4560-b356-8768d35fa33b
+using Base.Iterators: repeated, partition
+
+# ╔═╡ 3e832e16-a7be-4f8f-9ae2-3ee14f57b488
+using BSON
+
+# ╔═╡ 9766c738-95fd-40f7-8ab2-9704352df85a
+using Printf
+
+# ╔═╡ 8aec779b-c52f-47fb-bbb3-5c8fb84ed257
+using Parameters: @with_kw
+
+# ╔═╡ 2bad070d-22d8-411b-a7d5-f042437df774
+function load_data(path::String)
+    img_paths = readdir(path)
+    imgs = []
+    for img_path in img_paths
+        push!(imgs, load(string(path,img_path)))
+    end
+    return imgs
+end 
+
+# ╔═╡ 6e7bc8cc-8cd9-44d1-81da-373f3b5c1d36
+test_normal = [load(img) for img in readdir("C:/Users/Bytebox Technologies/Documents/ARI711S/chest_xray/test/NORMAL", join = true)]  
+
+# ╔═╡ 96dd19fd-4c07-454a-903e-11846eb54e8e
+test_pneumonia = [load(img) for img in readdir("C:/Users/Bytebox Technologies/Documents/ARI711S/chest_xray/test/PNEUMONIA", join = true)]
+
+# ╔═╡ 7c042968-3f72-431c-9c98-2b34f937478c
+n_img = load("C:/Users/Bytebox Technologies/Documents/ARI711S/chest_xray/train/NORMAL/IM-0115-0001.jpeg")
+
+# ╔═╡ 43a51e31-784f-44b5-ab05-a02ac1e1c303
+train_pneumonia = [load(img) for img in readdir("C:/Users/Bytebox Technologies/Documents/ARI711S/chest_xray/train/PNEUMONIA", join = true)]
+
+# ╔═╡ 955b1962-1b83-485c-b86e-95fddda6b47c
+p_img = load("C:/Users/Bytebox Technologies/Documents/ARI711S/chest_xray/train/PNEUMONIA/person1_bacteria_1.jpeg")
+
+# ╔═╡ 06bb810b-04cc-4218-9398-6db6292ea331
+val_normal = [load(img) for img in readdir("C:/Users/Bytebox Technologies/Documents/ARI711S/chest_xray/val/NORMAL", join = true)]
+
+# ╔═╡ d25a4bb3-a968-4655-a0e5-0275a866909b
+val_pneumonia = [load(img) for img in readdir("C:/Users/Bytebox Technologies/Documents/ARI711S/chest_xray/val/PNEUMONIA", join = true)]
+
+# ╔═╡ 21e69b4f-0742-4e1c-94a0-659efe6814b7
+# Exploration of the  image dataset"
+
+# ╔═╡ ec7749cd-4408-4183-9e9d-fbb72d21eccf
+size(test_normal)
+
+# ╔═╡ 5f96819e-d143-4a70-a0fd-86f160ed0509
+size(test_pneumonia)
+
+# ╔═╡ be16f4e7-509e-4f02-aab7-c677c57f7a29
+size(train_normal)
+
+# ╔═╡ 0133ecf1-2d01-475a-81f6-847a798b2260
+size(train_pneumonia)
+
+# ╔═╡ 42c98d91-5432-4760-8f22-2366708d6ae1
+size(val_normal)
+
+# ╔═╡ 650d81d9-d0d5-4a0e-991c-a7561cc40b3b
+size(val_pneumonia)
+
+# ╔═╡ 9a1fa142-d4c6-45eb-877d-8a91e2a3fdc3
+df(x) = gradient(f, x)[1]
+
+# ╔═╡ 0fa9ef51-c506-4499-b700-5c58106b0197
+ df(5)
+
+# ╔═╡ 3fc0b9f2-122d-4a40-b823-e4fa4cb5c250
+myloss(W, b, x) = sum(W * x .+ b)
+
+# ╔═╡ a9a14813-6e3a-4afe-b4c7-a8645ea9a2dc
+m = Dense(10, 5)
+
+# ╔═╡ 7ccf913b-69f5-40f4-87f1-9ebb73316b65
+gradient(myloss, W, b, x)
+
+# ╔═╡ 55557a22-d0cd-46f7-8c75-19de78a09411
+function imread()
+end
+
+# ╔═╡ 3ec8a9e2-01ea-4b2c-9b62-8a9e2b23f9f4
+begin
+	img = imread(nameFile)
+    temp = float32sc(img)
+    if ndims(temp) == 3
+		temp = mean(temp.data, 1)
+	end
+end
+
+# ╔═╡ e47bb16d-e9ab-4360-9746-95c9a0207e4d
+# Transforming images to arrays"
+
+# ╔═╡ ec90a249-0578-471a-999f-743374891814
+function make_batch(X, Y, idxs)
+    Xbatch = Array{Float32}(undef, size(X[1])..., 1, length(idxs))
+    for i in 1:length(idxs)
+        Xbatch[:, :, :, i] = Float32.(X[idxs[i]])
+    end
+	#encode labels in a matrix of 1's and 0's , using 0:9 as the possible class value
+    Ybatch = onehotbatch(Y[idxs], 0:9)
+    return (Xbatch, Ybatch)
+end
+
+
+# ╔═╡ 4607241b-a442-4a0a-89e7-dbbd53ff069f
+mb_idxs = partition(1:length(Ytrain), batchSize)
+
+# ╔═╡ 09d30508-1c96-4e2e-84e8-fc4f420571c5
+# Defining model architecture"
+
+# ╔═╡ ddbeb337-4415-4e15-9997-65a09c588389
+function build_model(args; imgSize = (28,28,1), nclasses = 8)
+    cnn_output_size = Int.(floor.([imgSize[1]/8,imgSize[2]/8,32]))	
+
+    return Chain(
+    # First convolution, operating upon a 28x28 image
+    Conv((3, 3), imgSize[3]=>16, pad=(1,1), stride=2, relu),
+    MaxPool((2,2)),
+		
+	# Second convolution, operating upon a 14x14 image
+    Conv((3, 3), 16=>32, pad=(1,1), relu),
+    MaxPool((2,2)),
+
+    # Third convolution, operating upon a 7x7 image
+    Conv((3, 3), 32=>32, pad=(1,1), relu),
+    MaxPool((2,2)),
+
+    # Reshape 3d tensor into a 2d one using `Flux.flatten`, at this point it should be (3, 3, 32, N)
+    flatten,
+    Dense(prod(cnn_output_size), 8))
+end
+
+
+# ╔═╡ 8bf7baa5-6a84-4d4e-a0cb-791054ffafb1
+# Defining utility"
+
+# ╔═╡ c15497f4-fa2b-4ec3-8d61-b564dcf96c42
+begin
+	augment(x) = x .+ gpu(0.1f0*randn(eltype(x), size(x)))
+	
+	# Returns a vector of all parameters used in model
+    paramvec(m) = hcat(map(p->reshape(p, :), params(m))...)
+
+    # Function to check if any element is NaN or not
+    anynan(x) = any(isnan.(x))
+
+    accuracy(x, y, model) = mean(onecold(cpu(model(x))) .== onecold(cpu(y)))
+end
+
+
+# ╔═╡ 3681f481-b69e-4aee-9831-c14e42d7a256
+# function train"
+
+# ╔═╡ c04ec005-e89a-41d0-8a2e-a5b9e252662a
+# function loss"
+
+# ╔═╡ 8167e41a-829d-4d8b-ad2f-1ffb0b8a2f3d
+function loss(x, y)
+	x̂ = augment(x)
+    ŷ = model(x̂)
+    return logitcrossentropy(ŷ, y)
+end  
+
+
+# ╔═╡ 0feefff8-8616-400f-b544-beabd6e335b3
+md"## optimiser"
+
+# ╔═╡ 78ccc894-c2aa-4da5-8d32-9ff4bd76cc74
+lr = 0.1
+
+# ╔═╡ f7bea574-dbb1-4757-abd9-a0ef62f00ff5
+opt = Descent(lr)
+
+# ╔═╡ cb7228a9-0732-474b-86aa-f919f883b590
+# model updates"
+
+# ╔═╡ 382f4608-9e36-4415-9528-b5bd71c9ab5a
+function sigmoid(z)
+1 ./ (1 .+ exp.(.-z))
+end
+
+
+# ╔═╡ 1b066509-fa30-4c95-9a23-579f3efaddf0
+function transform_features(xMatrix, u, o)
+       XNorm = (xMatrix .- u) ./ o
+       return X_norm
+       end
+
+# ╔═╡ a09bb3c7-5036-46da-8b4d-f5d1bdb0b1f3
+train_normal = [load(img) for img in readdir("C:/Users/Bytebox Technologies/Documents/ARI711S/chest_xray/train/NORMAL", join = true)]
+
+# ╔═╡ bf83a4ee-3d97-41ae-a78f-b85d64f7206e
+train_normal = load_data("C:\\Users\\Bytebox Technologies\\Documents\\chest_xray\\train\\NORMAL")
+
+# ╔═╡ d8fe4073-a4f2-4776-8740-3f166290da0a
+begin
+	W = randn(3, 5)
+    b = zeros(3)
+    x = rand(5)
+end
+
+# ╔═╡ f81ac933-d78d-4782-90f9-bcaa9cd01a40
+x = rand(Float32, 10)
+
+# ╔═╡ Cell order:
+# ╠═4f1ec150-b3de-11ec-3f9f-db6cf54ada63
+# ╠═9463ff9e-06fd-41c7-8f64-54fc64b42bcd
+# ╠═ccf17592-b521-4a58-b214-9cd3e34d0264
+# ╠═a2ce2e7d-0615-475e-b3b8-8b9ce314d646
+# ╠═c18e0609-311b-490d-9d5b-cfafe605f51c
+# ╠═214febd3-18a4-407b-941f-06d95d56a31e
+# ╠═cc7e687b-dd63-420b-bf48-c4ffa596ac51
+# ╠═4ff80e3e-599b-45b2-8d2c-59fa9cd334ed
+# ╠═51ec180c-1a5c-4378-b873-9ba320166fe5
+# ╠═c379e610-a11a-459a-b929-ff41674bcd1a
+# ╠═1460bebf-eb78-4a52-955d-6241b2e82866
+# ╠═8c4d99b0-ba06-4e29-a31e-1564d48c3e0d
+# ╠═9c547013-90e6-49aa-8ecc-9c43c4cadc10
+# ╠═aea554c2-6199-4f17-a735-68c3b3614534
+# ╠═b55eabd1-101f-40fb-bb55-350c3bcb90c4
+# ╠═cc274870-cd4d-4d3a-9bd1-b44ee6a5db5f
+# ╠═438d34df-d1cd-4560-b356-8768d35fa33b
+# ╠═3e832e16-a7be-4f8f-9ae2-3ee14f57b488
+# ╠═9766c738-95fd-40f7-8ab2-9704352df85a
+# ╠═8aec779b-c52f-47fb-bbb3-5c8fb84ed257
+# ╠═2bad070d-22d8-411b-a7d5-f042437df774
+# ╠═6e7bc8cc-8cd9-44d1-81da-373f3b5c1d36
+# ╠═96dd19fd-4c07-454a-903e-11846eb54e8e
+# ╠═bf83a4ee-3d97-41ae-a78f-b85d64f7206e
+# ╠═a09bb3c7-5036-46da-8b4d-f5d1bdb0b1f3
+# ╠═7c042968-3f72-431c-9c98-2b34f937478c
+# ╠═43a51e31-784f-44b5-ab05-a02ac1e1c303
+# ╠═955b1962-1b83-485c-b86e-95fddda6b47c
+# ╠═06bb810b-04cc-4218-9398-6db6292ea331
+# ╠═d25a4bb3-a968-4655-a0e5-0275a866909b
+# ╠═21e69b4f-0742-4e1c-94a0-659efe6814b7
+# ╠═ec7749cd-4408-4183-9e9d-fbb72d21eccf
+# ╠═5f96819e-d143-4a70-a0fd-86f160ed0509
+# ╠═be16f4e7-509e-4f02-aab7-c677c57f7a29
+# ╠═0133ecf1-2d01-475a-81f6-847a798b2260
+# ╠═42c98d91-5432-4760-8f22-2366708d6ae1
+# ╠═650d81d9-d0d5-4a0e-991c-a7561cc40b3b
+# ╠═9a1fa142-d4c6-45eb-877d-8a91e2a3fdc3
+# ╠═0fa9ef51-c506-4499-b700-5c58106b0197
+# ╠═3fc0b9f2-122d-4a40-b823-e4fa4cb5c250
+# ╠═d8fe4073-a4f2-4776-8740-3f166290da0a
+# ╠═7ccf913b-69f5-40f4-87f1-9ebb73316b65
+# ╠═a9a14813-6e3a-4afe-b4c7-a8645ea9a2dc
+# ╠═f81ac933-d78d-4782-90f9-bcaa9cd01a40
+# ╠═55557a22-d0cd-46f7-8c75-19de78a09411
+# ╠═3ec8a9e2-01ea-4b2c-9b62-8a9e2b23f9f4
+# ╠═e47bb16d-e9ab-4360-9746-95c9a0207e4d
+# ╠═ec90a249-0578-471a-999f-743374891814
+# ╠═4607241b-a442-4a0a-89e7-dbbd53ff069f
+# ╠═09d30508-1c96-4e2e-84e8-fc4f420571c5
+# ╠═ddbeb337-4415-4e15-9997-65a09c588389
+# ╠═8bf7baa5-6a84-4d4e-a0cb-791054ffafb1
+# ╠═c15497f4-fa2b-4ec3-8d61-b564dcf96c42
+# ╠═3681f481-b69e-4aee-9831-c14e42d7a256
+# ╠═c04ec005-e89a-41d0-8a2e-a5b9e252662a
+# ╠═8167e41a-829d-4d8b-ad2f-1ffb0b8a2f3d
+# ╠═0feefff8-8616-400f-b544-beabd6e335b3
+# ╠═78ccc894-c2aa-4da5-8d32-9ff4bd76cc74
+# ╠═f7bea574-dbb1-4757-abd9-a0ef62f00ff5
+# ╠═cb7228a9-0732-474b-86aa-f919f883b590
+# ╠═382f4608-9e36-4415-9528-b5bd71c9ab5a
+# ╠═1b066509-fa30-4c95-9a23-579f3efaddf0
